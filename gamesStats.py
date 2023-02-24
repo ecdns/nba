@@ -9,6 +9,8 @@ import asyncio
 DATA_DIR = "data"
 STANDINGS_DIR = os.path.join(DATA_DIR, "standings")
 SCORES_DIR = os.path.join(DATA_DIR, "scores")
+box_scores = os.listdir(SCORES_DIR)
+box_scores = [os.path.join(SCORES_DIR, f) for f in box_scores if f.endswith(".html")]
 standings_files = os.listdir(STANDINGS_DIR)
 
 async def get_html(url, selector, sleep=5, retries=3):
@@ -29,18 +31,18 @@ async def get_html(url, selector, sleep=5, retries=3):
     return html
 
 async def scrape_season():
-    url = f"https://www.basketball-reference.com/leagues/NBA_2023_games.html"
+    url = "https://www.basketball-reference.com/leagues/NBA_2023_games.html"
     html = await get_html(url, "#content .filter")
 
     soup = BeautifulSoup(html, "html.parser")
+    # Chaque mois de la saison
     links = soup.find_all("a")
-    # Création d'une nouvelle liste href à partir de toutes les valeurs des clés href de la liste links
+    # Liste avec les liens de chacun des mois
     href = [l["href"] for l in links]
-
+    # Chaque page de résultats de chaque mois
     standings_pages = [f"https://basketball-reference.com{l}" for l in href]
     for url in standings_pages:
-        print (url)
-        #liaison de deux chemins pour former le chemin du répertoire dans lequel nous enregistrons la page scrappée
+        # Rajout du mois dans le lien du fichier
         save_path = os.path.join(STANDINGS_DIR, url.split("/")[-1])
         if os.path.exists(save_path):
             continue
@@ -49,21 +51,25 @@ async def scrape_season():
             f.write(html)
 
 async def scrape_game(standings_file):
-    standings_file = standings_files[6]
 
-    with open(f"data/standings/{standings_file}", "r") as f:
+    with open(standings_file, "r") as f:
         html = f.read()
 
     soup = BeautifulSoup(html, "html.parser")
+    # Tous les liens de la page de résultats pour octobre
     links = soup.find_all('a')
 
     hrefs = [l.get("href") for l in links]
     box_scores = [l for l in hrefs if l and "boxscore" in l and ".html" in l]
+    # Obtenir tous les liens des box scores
     box_scores = [f"https://www.basketball-reference.com{l}" for l in box_scores]
 
     for url in box_scores:
         save_path = os.path.join(SCORES_DIR, url.split("/")[-1])
         if(os.path.exists(save_path)):
+            continue
+        html = await get_html(url, "#content")
+        if not html:
             continue
         with open(save_path, "w+") as f:
             f.write(html)
@@ -73,7 +79,7 @@ def parse_html(box_score):
     with open(box_score) as f:
         html = f.read()
 
-    soup = BeautifulSoup(html, 'html.parse')
+    soup = BeautifulSoup(html, "html5lib")
     [s.decompose() for s in soup.select("tr.over_header")]
     [s.decompose() for s in soup.select("tr.thead")]
 
@@ -84,11 +90,11 @@ def read_line_score(soup):
     cols = list(line_score.columns)
     cols[0] = "team"
     cols[-1] = "total"
-    line_score = line_score[["team"], ["total"]]
+    line_score.columns = cols
     return line_score
 
 # Parcourir chaque mois de la saison
-standings_files = [s for s in standings_files if('.html') in s]
+standings_files = [s for s in standings_files if '.html' in s]
 for f in standings_files:
     filepath = os.path.join(STANDINGS_DIR, f)
     asyncio.run(scrape_game(filepath))
