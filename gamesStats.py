@@ -44,8 +44,6 @@ async def scrape_season():
     for url in standings_pages:
         # Rajout du mois dans le lien du fichier
         save_path = os.path.join(STANDINGS_DIR, url.split("/")[-1])
-        if os.path.exists(save_path):
-            continue
         html = await get_html(url, "#all_schedule")
         with open(save_path, "w+") as f:
             f.write(html)
@@ -93,8 +91,11 @@ def read_line_score(soup):
     line_score.columns = cols
     return line_score
 
-# Parcourir chaque mois de la saison
-standings_files = [s for s in standings_files if '.html' in s]
-for f in standings_files:
-    filepath = os.path.join(STANDINGS_DIR, f)
-    asyncio.run(scrape_game(filepath))
+def update():
+    asyncio.run(scrape_season())
+    # Parcourir chaque mois de la saison
+    standings_files = [s for s in standings_files if '.html' in s]
+    for f in standings_files:
+        filepath = os.path.join(STANDINGS_DIR, f)
+        print(filepath)
+        asyncio.run(scrape_game(filepath))
