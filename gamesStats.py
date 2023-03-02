@@ -93,6 +93,7 @@ def read_line_score(soup):
 # Lire les stats d'une des deux équipes de la rencontre
 def read_stats(soup, team, stat):
     df = pd.read_html(str(soup), attrs={"id": f"box-{team}-game-{stat}"}, index_col=0)[0]
+    df = df.apply(pd.to_numeric, errors="coerce")
     return df
 
 def update():
@@ -101,38 +102,55 @@ def update():
     standings_files = [s for s in standings_files if '.html' in s]
     for f in standings_files:
         filepath = os.path.join(STANDINGS_DIR, f)
-        print(filepath)
         asyncio.run(scrape_game(filepath))
 
+games = []
 base_cols = None
-box_score = box_scores[0]
-print(box_score)
-soup = parse_html(box_score)
-line_score = read_line_score(soup)
-teams = list(line_score["team"])
 
-summaries = []
-for team in teams:
-    basic = read_stats(soup, team, "basic")
-    advanced = read_stats(soup, team, "advanced")
-    totals = pd.concat([basic.iloc[-1,:], advanced.iloc[-1,:]]) 
-    totals.index = totals.index.str.lower()
+for box_score in box_scores:
+    print(os.path.basename(box_score))
+    soup = parse_html(box_score)
+    line_score = read_line_score(soup)
+    teams = list(line_score["team"])
 
-    # Maximums de chacunes des colonnes des tableaux basic et advance 
-    maxes = pd.concat([basic.iloc[:-1,:].max(), advanced.iloc[:-1,:].max()])
-    maxes.index = maxes.index.str.lower() + "_max"
-    print(maxes)
+    summaries = []
+    for team in teams:
+        basic = read_stats(soup, team, "basic")
+        advanced = read_stats(soup, team, "advanced")
 
-    summary = pd.concat([totals, maxes])
+        totals = pd.concat([basic.iloc[-1,:], advanced.iloc[-1,:]]) 
+        totals.index = totals.index.str.lower()
 
-    if(base_cols is None):
-        # Supprime les colonnes qui sont identiques (mp)
-        base_cols = list(summary.index.drop_duplicates(keep="first"))
-        # bpm est dans certaines box scores mais pas dans d'autres
-        base_cols = [b for b in base_cols if "bpm" not in b]
+        # Maximums de chacunes des colonnes des tableaux basic et advance 
+        maxes = pd.concat([basic.iloc[:-1,:].max(), advanced.iloc[:-1,:].max()])
+        maxes.index = maxes.index.str.lower() + "_max"
+        summary = pd.concat([totals, maxes])
 
-    summary = summary[base_cols]
-    summaries.append(summary)
-summary = pd.concat(summaries, axis=1).T
+        if(base_cols is None):
+            # Supprime les colonnes qui sont identiques (mp)
+            base_cols = list(summary.index.drop_duplicates(keep="first"))
+            # bpm est dans certaines box scores mais pas dans d'autres
+            base_cols = [b for b in base_cols if "bpm" not in b]
 
-game = pd.concat([summary, line_score], axis=1)
+        summary = summary[base_cols]
+        summaries.append(summary)
+    # Concaténer dans un summary seul
+    summary = pd.concat(summaries, axis=1).T
+
+    #Nouvelle colonne dans summary -> axis 1 colonne
+    game = pd.concat([summary, line_score[["team", "total"]]], axis=1)
+    game["home"] = [0, 1]
+    # Utiliser des nouveaux index
+    game_opp = game.iloc[::-1].reset_index()
+    game_opp.columns += "_opp"
+
+    full_game = pd.concat([game, game_opp], axis=1)
+
+    full_game["date"] = os.path.basename(box_score)[:8]
+    full_game["date"] = pd.to_datetime(full_game["date"], format="%Y%m%d")
+
+    full_game["won"] = full_game["total"] > full_game["total_opp"]
+    games.append(full_game)
+
+    if len(games) % 100 == 0:
+        print(f"{len(games)} / {len(box_scores)}")
