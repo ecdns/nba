@@ -11,7 +11,6 @@ STANDINGS_DIR = os.path.join(DATA_DIR, "standings")
 SCORES_DIR = os.path.join(DATA_DIR, "scores")
 box_scores = os.listdir(SCORES_DIR)
 box_scores = [os.path.join(SCORES_DIR, f) for f in box_scores if f.endswith(".html")]
-standings_files = os.listdir(STANDINGS_DIR)
 
 async def get_html(url, selector, sleep=5, retries=3):
     html = None
@@ -97,6 +96,7 @@ def read_stats(soup, team, stat):
     return df
 
 def update():
+    standings_files = os.listdir(STANDINGS_DIR)
     asyncio.run(scrape_season())
     # Parcourir chaque mois de la saison
     standings_files = [s for s in standings_files if '.html' in s]
@@ -104,53 +104,59 @@ def update():
         filepath = os.path.join(STANDINGS_DIR, f)
         asyncio.run(scrape_game(filepath))
 
-games = []
-base_cols = None
+def getAllStats():
+    games = []
+    base_cols = None
 
-for box_score in box_scores:
-    print(os.path.basename(box_score))
-    soup = parse_html(box_score)
-    line_score = read_line_score(soup)
-    teams = list(line_score["team"])
+    for box_score in box_scores:
+        print(os.path.basename(box_score))
+        soup = parse_html(box_score)
+        line_score = read_line_score(soup)
+        teams = list(line_score["team"])
 
-    summaries = []
-    for team in teams:
-        basic = read_stats(soup, team, "basic")
-        advanced = read_stats(soup, team, "advanced")
+        summaries = []
+        for team in teams:
+            basic = read_stats(soup, team, "basic")
+            advanced = read_stats(soup, team, "advanced")
 
-        totals = pd.concat([basic.iloc[-1,:], advanced.iloc[-1,:]]) 
-        totals.index = totals.index.str.lower()
+            totals = pd.concat([basic.iloc[-1,:], advanced.iloc[-1,:]]) 
+            totals.index = totals.index.str.lower()
 
-        # Maximums de chacunes des colonnes des tableaux basic et advance 
-        maxes = pd.concat([basic.iloc[:-1,:].max(), advanced.iloc[:-1,:].max()])
-        maxes.index = maxes.index.str.lower() + "_max"
-        summary = pd.concat([totals, maxes])
+            # Maximums de chacunes des colonnes des tableaux basic et advance 
+            maxes = pd.concat([basic.iloc[:-1,:].max(), advanced.iloc[:-1,:].max()])
+            maxes.index = maxes.index.str.lower() + "_max"
+            summary = pd.concat([totals, maxes])
 
-        if(base_cols is None):
-            # Supprime les colonnes qui sont identiques (mp)
-            base_cols = list(summary.index.drop_duplicates(keep="first"))
-            # bpm est dans certaines box scores mais pas dans d'autres
-            base_cols = [b for b in base_cols if "bpm" not in b]
+            if(base_cols is None):
+                # Supprime les colonnes qui sont identiques (mp)
+                base_cols = list(summary.index.drop_duplicates(keep="first"))
+                # bpm est dans certaines box scores mais pas dans d'autres
+                base_cols = [b for b in base_cols if "bpm" not in b]
 
-        summary = summary[base_cols]
-        summaries.append(summary)
-    # Concaténer dans un summary seul
-    summary = pd.concat(summaries, axis=1).T
+            summary = summary[base_cols]
+            summaries.append(summary)
+        # Concaténer dans un summary seul
+        summary = pd.concat(summaries, axis=1).T
 
-    #Nouvelle colonne dans summary -> axis 1 colonne
-    game = pd.concat([summary, line_score[["team", "total"]]], axis=1)
-    game["home"] = [0, 1]
-    # Utiliser des nouveaux index
-    game_opp = game.iloc[::-1].reset_index()
-    game_opp.columns += "_opp"
+        #Nouvelle colonne dans summary -> axis 1 colonne
+        game = pd.concat([summary, line_score[["team", "total"]]], axis=1)
+        game["home"] = [0, 1]
+        # Utiliser des nouveaux index
+        game_opp = game.iloc[::-1].reset_index()
+        game_opp.columns += "_opp"
 
-    full_game = pd.concat([game, game_opp], axis=1)
+        full_game = pd.concat([game, game_opp], axis=1)
 
-    full_game["date"] = os.path.basename(box_score)[:8]
-    full_game["date"] = pd.to_datetime(full_game["date"], format="%Y%m%d")
+        full_game["date"] = os.path.basename(box_score)[:8]
+        full_game["date"] = pd.to_datetime(full_game["date"], format="%Y%m%d")
 
-    full_game["won"] = full_game["total"] > full_game["total_opp"]
-    games.append(full_game)
+        full_game["won"] = full_game["total"] > full_game["total_opp"]
+        games.append(full_game)
 
-    if len(games) % 100 == 0:
-        print(f"{len(games)} / {len(box_scores)}")
+        if len(games) % 100 == 0:
+            print(f"{len(games)} / {len(box_scores)}")
+
+        games_df = pd.concat(games, ignore_index=True)
+        games_df.to_csv("nba_games.csv")
+
+getAllStats()
