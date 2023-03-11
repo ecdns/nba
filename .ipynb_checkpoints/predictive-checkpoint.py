@@ -70,11 +70,12 @@ def backtest(data, model, predictors, date):
 
     train = data[data["date"] < date]
     model.fit(train[predictors], train["target"])
+    test = data[data["date"] == date]
 
-    preds = model.predict(data[predictors])
-    preds = pd.Series(preds, index=data.index)
+    preds = model.predict(test[predictors])
+    preds = pd.Series(preds, index=test.index)
 
-    combined = pd.concat([data["target"], preds], axis=1)
+    combined = pd.concat([test["target"], preds], axis=1)
     combined.columns = ["actual", "prediction"]
 
     all_predictions.append(combined)
@@ -85,7 +86,7 @@ df_rolling = df[list(selected_columns) + ["won", "team"]]
 
 # Groupe les 10 dernières lignes d'une équipe de notre df, pour chacune des lignes, retourne la moyenne avec mean
 def find_team_averages(team):
-    rolling = team.rolling(50).mean()
+    rolling = team.rolling(30).mean()
     return rolling
 # Regrouper nos colonnes pour une équipe spécifique
 df_rolling = df_rolling.groupby(["team"], group_keys = False).apply(find_team_averages)
@@ -117,8 +118,7 @@ removed_columns = list(full.columns[full.dtypes == "object"]) + removed_columns
 selected_columns = full.columns[~full.columns.isin(removed_columns)]
 
 sfs.fit(full[selected_columns], full["target"])
-predictions = backtest(full, rr, predictors, "2023-03-11")
+predictions = backtest(full, rr, predictors, "2023-03-01")
 accuracy = accuracy_score(predictions["actual"], predictions["prediction"])
 full = pd.concat([full, predictions], axis=1)
-
-print(full)
+print (full)
