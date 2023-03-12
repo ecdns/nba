@@ -5,6 +5,7 @@ import os
 import time
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
 import asyncio
+import csv
 
 DATA_DIR = "data"
 STANDINGS_DIR = os.path.join(DATA_DIR, "standings")
@@ -155,9 +156,8 @@ def getAllStats():
 
         if len(games) % 100 == 0:
             print(f"{len(games)} / {len(box_scores)}")
-
-        games_df = pd.concat(games, ignore_index=True)
-        games_df.to_csv("nba_games.csv")
+    games_df = pd.concat(games, ignore_index=True)
+    games_df.to_csv("nba_games.csv")
 
 update()
 getAllStats()
