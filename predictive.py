@@ -115,7 +115,6 @@ full = df.merge(df[rolling_cols + ["team_opp_next", "date_next", "team"]],
 
 removed_columns = list(full.columns[full.dtypes == "object"]) + removed_columns
 selected_columns = full.columns[~full.columns.isin(removed_columns)]
-print(selected_columns)
 
 sfs.fit(full[selected_columns], full["target"])
 predictions = backtest(full, rr, predictors, "2023-03-11")
@@ -126,3 +125,4 @@ full = pd.concat([full, predictions], axis=1)
 myDfPrediction = full.loc[:, ["team_x", "team_opp", "won", "home", "date", "won_10_y", "team_opp_next_x", "prediction", "target"]]
 
 print(myDfPrediction)
+print(full.tail(20))
