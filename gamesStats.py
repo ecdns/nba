@@ -156,7 +156,8 @@ def getAllStats():
 
         if len(games) % 100 == 0:
             print(f"{len(games)} / {len(box_scores)}")
-    games_df = pd.concat(games, ignore_index=True)
+    # → Trier les lignes avec la date et obtenir les nouveaux index ensuite, sans créer une colonne des anciens index
+    games_df = pd.concat(games, ignore_index=True).sort_values("date").reset_index(drop=True)
     games_df.to_csv("nba_games.csv")
 
 update()

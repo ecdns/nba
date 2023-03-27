@@ -12,14 +12,9 @@ from sklearn.metrics import accuracy_score
 
 df = pd.read_csv("nba_games.csv", index_col=0)
 
-# → Trier les lignes avec la date et obtenir les nouveaux index ensuite, sans créer une colonne des anciens index
-df = df.sort_values("date")
-df = df.reset_index(drop=True)
-
 del df["mp.1"]
 del df["mp_opp.1"]
 del df["index_opp"]
-
 
 # team = box scores for one team
 # add_target => inclue une colonne indiquant le résultat de l'équipe au match d'après
@@ -33,6 +28,7 @@ df["target"][pd.isnull(df["target"])] = 2
 df["target"] = df["target"].astype(int, errors="ignore")
 
 team_df = df[df["team"] == "WAS"]
+
 
 # Checker toutes les valeurs nulles de notre dataframe : false si c'est not null, true si c'est null
 nulls = pd.isnull(df).sum()
@@ -59,7 +55,7 @@ selected_columns = df.columns[~df.columns.isin(removed_columns)]
 scaler = MinMaxScaler()
 df[selected_columns] = scaler.fit_transform(df[selected_columns])
 
-# Récupérer les 30 meilleures features pour prédire
+# Récupérer les 30 meilleures features pour prédire les labels
 sfs.fit(df[selected_columns], df["target"])
 
 # sfs.get_support => True: colonnes pertinentes pour notre prédiction
@@ -124,5 +120,3 @@ full = pd.concat([full, predictions], axis=1)
 
 myDfPrediction = full.loc[:, ["team_x", "team_opp", "won", "home", "date", "won_10_y", "team_opp_next_x", "prediction", "target"]]
 
-print(myDfPrediction)
-print(full.tail(20))
