@@ -117,3 +117,6 @@ predictions = backtest(full, rr, predictors, "2023-03-11")
 accuracy = accuracy_score(predictions["actual"], predictions["prediction"])
 
 full = pd.concat([full, predictions], axis=1)
+
+myDfPrediction = full.loc[:, ["team_x", "team_opp", "won", "home", "date", "won_10_y", "team_opp_next_x", "prediction", "target"]]
+
